@@ -156,3 +156,84 @@
     world-access: (list 10 uint)
   }
 )
+
+;; Game Worlds
+(define-map game-worlds
+  { world-id: uint }
+  {
+    name: (string-ascii 50),
+    description: (string-ascii 200),
+    entry-requirement: uint,
+    active-players: uint,
+    total-rewards: uint
+  }
+)
+
+;; Leaderboard System
+(define-map leaderboard 
+  { player: principal }
+  { 
+    score: uint, 
+    games-played: uint,
+    total-rewards: uint,
+    avatar-id: uint,
+    rank: uint,
+    achievements: (list 20 (string-ascii 50))
+  }
+)
+
+;; Leaderboard System
+(define-map player-rankings
+  { rank: uint }
+  { player: principal, score: uint }
+)
+
+;; Trade System
+(define-map active-trades
+  { trade-id: uint }
+  {
+    seller: principal,
+    asset-id: uint,
+    price: uint,
+    expiry: uint,
+    status: (string-ascii 20),
+    buyer: (optional principal)
+  }
+)
+
+;; Security Enhancement: Rate Limiting
+(define-map rate-limits
+  { function: (string-ascii 50), caller: principal }
+  { last-call: uint, calls: uint }
+)
+
+
+;; Utility Functions
+(define-read-only (is-protocol-admin (sender principal))
+  (default-to false (map-get? protocol-admin-whitelist sender))
+)
+
+(define-read-only (is-valid-principal (input principal))
+  (and 
+    (not (is-eq input tx-sender))
+    (not (is-eq input (as-contract tx-sender)))
+  )
+)
+
+(define-read-only (is-safe-principal (input principal))
+  (and 
+    (is-valid-principal input)
+    (or 
+      (is-protocol-admin input)
+      (is-some (map-get? leaderboard { player: input }))
+    )
+  )
+)
+
+(define-read-only (get-world-details (world-id uint))
+  (map-get? game-worlds { world-id: world-id })
+)
+
+(define-read-only (get-avatar-details (avatar-id uint))
+  (map-get? avatar-metadata { avatar-id: avatar-id })
+)
