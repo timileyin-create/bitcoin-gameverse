@@ -553,3 +553,101 @@
     (ok true)
   )
 )
+
+;; Event Emission Functions
+(define-public (emit-asset-event 
+    (event-type (string-ascii 20))
+    (asset-id uint)
+    (sender principal)
+    (recipient (optional principal))
+  )
+  (begin
+    (print {
+      event: event-type,
+      asset-id: asset-id,
+      sender: sender,
+      recipient: recipient,
+      timestamp: block-height
+    })
+    (ok true)
+  )
+)
+
+;; Trading System
+(define-public (create-trade
+    (asset-id uint)
+    (price uint)
+    (expiry uint)
+  )
+  (let
+    (
+      (trade-id (+ (var-get total-trades) u1))
+      (owner (unwrap! (nft-get-owner? gameverse-asset asset-id) ERR-INVALID-GAME-ASSET))
+    )
+    
+    ;; Add price validation
+    (asserts! (> price u0) ERR-INVALID-INPUT)
+    (asserts! (< price u1000000000) ERR-INVALID-INPUT) ;; Set reasonable maximum price
+    (asserts! (is-eq tx-sender owner) ERR-NOT-AUTHORIZED)
+    (asserts! (> expiry block-height) ERR-INVALID-INPUT)
+    
+    (map-set active-trades
+      { trade-id: trade-id }
+      {
+        seller: tx-sender,
+        asset-id: asset-id,
+        price: price,
+        expiry: expiry,
+        status: "active",
+        buyer: none
+      }
+    )
+    
+    (var-set total-trades trade-id)
+    
+    (unwrap! (emit-asset-event EVENT-TRADE-INITIATED asset-id tx-sender none) ERR-NOT-AUTHORIZED)
+    
+    (ok trade-id)
+  )
+)
+
+(define-public (execute-trade (trade-id uint))
+  (let
+    (
+      (total-trades-count (var-get total-trades))
+    )
+    ;; Validate trade-id
+    (asserts! (<= trade-id total-trades-count) ERR-TRADE-NOT-FOUND)
+    (asserts! (> trade-id u0) ERR-INVALID-INPUT)
+    
+    (let
+      (
+        (trade (unwrap! (map-get? active-trades { trade-id: trade-id }) ERR-TRADE-NOT-FOUND))
+        (asset-id (get asset-id trade))
+      )
+      
+      (asserts! (is-eq (get status trade) "active") ERR-INVALID-TRADE-STATUS)
+      (asserts! (<= block-height (get expiry trade)) ERR-TRADE-EXPIRED)
+      (asserts! (>= (stx-get-balance tx-sender) (get price trade)) ERR-INSUFFICIENT-BALANCE)
+      
+      ;; Transfer STX
+      (try! (stx-transfer? (get price trade) tx-sender (get seller trade)))
+      
+      ;; Transfer NFT
+      (try! (nft-transfer? gameverse-asset asset-id (get seller trade) tx-sender))
+      
+      ;; Update trade status
+      (map-set active-trades
+        { trade-id: trade-id }
+        (merge trade {
+          status: "completed",
+          buyer: (some tx-sender)
+        })
+      )
+      
+      (unwrap! (emit-asset-event EVENT-TRADE-COMPLETED asset-id (get seller trade) (some tx-sender)) ERR-NOT-AUTHORIZED)
+      
+      (ok true)
+    )
+  )
+)
