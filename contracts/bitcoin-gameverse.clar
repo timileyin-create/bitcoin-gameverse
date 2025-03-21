@@ -237,3 +237,72 @@
 (define-read-only (get-avatar-details (avatar-id uint))
   (map-get? avatar-metadata { avatar-id: avatar-id })
 )
+
+(define-read-only (get-top-players)
+  (let 
+    (
+      (max-entries (var-get max-leaderboard-entries))
+    )
+    (list 
+      tx-sender
+    )
+  )
+)
+
+;; Read-only function to get experience required for next level
+(define-read-only (get-next-level-requirement
+    (avatar-id uint)
+  )
+  (match (get-avatar-details avatar-id)
+    metadata (ok (calculate-level-up-experience (get level metadata)))
+    ERR-INVALID-AVATAR
+  )
+)
+
+;; Read-only function to check if avatar can receive experience
+(define-read-only (can-receive-experience
+    (avatar-id uint)
+    (experience-amount uint)
+  )
+  (match (get-avatar-details avatar-id)
+    metadata (ok (and
+      (< (get level metadata) MAX-LEVEL)
+      (validate-experience-gain 
+        (get experience metadata)
+        experience-amount
+        (get level metadata)
+      )))
+    ERR-INVALID-AVATAR
+  )
+)
+
+;; Leaderboard Functions
+(define-read-only (get-paginated-leaderboard (page uint) (items-per-page uint))
+  (let
+    (
+      (start (* page items-per-page))
+      (end (+ start items-per-page))
+    )
+    (filter is-valid-ranking
+      (map get-ranking-at-position (generate-sequence start end))
+    )
+  )
+)
+
+
+;; Protocol Management
+(define-public (initialize-protocol 
+  (entry-fee uint) 
+  (max-entries uint)
+)
+  (begin
+    (asserts! (is-protocol-admin tx-sender) ERR-NOT-AUTHORIZED)
+    (asserts! (and (>= entry-fee u1) (<= entry-fee u1000)) ERR-INVALID-FEE)
+    (asserts! (and (>= max-entries u1) (<= max-entries u500)) ERR-INVALID-ENTRIES)
+    
+    (var-set protocol-fee entry-fee)
+    (var-set max-leaderboard-entries max-entries)
+    
+    (ok true)
+  )
+)
