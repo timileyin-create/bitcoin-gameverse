@@ -72,3 +72,87 @@
 (define-data-var total-avatars uint u0)
 (define-data-var total-worlds uint u0)
 (define-data-var total-trades uint u0)
+;; Protocol Administrator Whitelist
+(define-map protocol-admin-whitelist principal bool)
+
+;; Input Validation Functions
+(define-private (is-valid-name (name (string-ascii 50)))
+  (and 
+    (>= (len name) u1)
+    (<= (len name) u50)
+    (not (is-eq name ""))
+  )
+)
+
+(define-private (is-valid-description (description (string-ascii 200)))
+  (and 
+    (>= (len description) u1)
+    (<= (len description) u200)
+    (not (is-eq description ""))
+  )
+)
+
+(define-private (is-valid-rarity (rarity (string-ascii 20)))
+  (or 
+    (is-eq rarity "common")
+    (is-eq rarity "uncommon")
+    (is-eq rarity "rare")
+    (is-eq rarity "epic")
+    (is-eq rarity "legendary")
+  )
+)
+
+(define-private (is-valid-power-level (power uint))
+  (and (>= power u1) (<= power u1000))
+)
+
+(define-private (is-valid-attributes (attributes (list 10 (string-ascii 20))))
+  (and 
+    (>= (len attributes) u1)
+    (<= (len attributes) u10)
+  )
+)
+
+(define-private (is-valid-world-access (worlds (list 10 uint)))
+  (and 
+    (>= (len worlds) u1)
+    (<= (len worlds) u10)
+    (fold check-world-exists worlds true)
+  )
+)
+
+(define-private (check-world-exists (world-id uint) (valid bool))
+  (and valid (is-some (get-world-details world-id)))
+)
+
+;; NFT Definitions
+(define-non-fungible-token gameverse-asset uint)
+(define-non-fungible-token player-avatar uint)
+
+;; Asset Metadata Map
+(define-map gameverse-asset-metadata 
+  { token-id: uint }
+  { 
+    name: (string-ascii 50),
+    description: (string-ascii 200),
+    rarity: (string-ascii 20),
+    power-level: uint,
+    world-id: uint,
+    attributes: (list 10 (string-ascii 20)),
+    experience: uint,
+    level: uint
+  }
+)
+
+;; Player Avatar Map
+(define-map avatar-metadata
+  { avatar-id: uint }
+  {
+    name: (string-ascii 50),
+    level: uint,
+    experience: uint,
+    achievements: (list 20 (string-ascii 50)),
+    equipped-assets: (list 5 uint),
+    world-access: (list 10 uint)
+  }
+)
