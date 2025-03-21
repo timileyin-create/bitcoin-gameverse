@@ -567,7 +567,7 @@
       asset-id: asset-id,
       sender: sender,
       recipient: recipient,
-      timestamp: block-height
+      timestamp: stacks-block-height
     })
     (ok true)
   )
@@ -589,7 +589,7 @@
     (asserts! (> price u0) ERR-INVALID-INPUT)
     (asserts! (< price u1000000000) ERR-INVALID-INPUT) ;; Set reasonable maximum price
     (asserts! (is-eq tx-sender owner) ERR-NOT-AUTHORIZED)
-    (asserts! (> expiry block-height) ERR-INVALID-INPUT)
+    (asserts! (> expiry stacks-block-height) ERR-INVALID-INPUT)
     
     (map-set active-trades
       { trade-id: trade-id }
@@ -627,7 +627,7 @@
       )
       
       (asserts! (is-eq (get status trade) "active") ERR-INVALID-TRADE-STATUS)
-      (asserts! (<= block-height (get expiry trade)) ERR-TRADE-EXPIRED)
+      (asserts! (<= stacks-block-height (get expiry trade)) ERR-TRADE-EXPIRED)
       (asserts! (>= (stx-get-balance tx-sender) (get price trade)) ERR-INSUFFICIENT-BALANCE)
       
       ;; Transfer STX
@@ -754,11 +754,11 @@
         (map-get? rate-limits { function: function, caller: tx-sender })
       ))
     )
-    (if (> (- block-height (get last-call current-limits)) RATE-LIMIT-WINDOW)
+    (if (> (- stacks-block-height (get last-call current-limits)) RATE-LIMIT-WINDOW)
       (begin
         (map-set rate-limits
           { function: function, caller: tx-sender }
-          { last-call: block-height, calls: u1 }
+          { last-call: stacks-block-height, calls: u1 }
         )
         true
       )
