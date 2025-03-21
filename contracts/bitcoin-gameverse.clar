@@ -415,3 +415,61 @@
     (ok avatar-id)
   )
 )
+
+(define-public (update-avatar-experience
+    (avatar-id uint)
+    (experience-gained uint)
+  )
+  (let
+    (
+      ;; Unwrap metadata with safety checks
+      (current-metadata (unwrap! (get-avatar-details avatar-id) ERR-INVALID-AVATAR))
+      (avatar-owner (unwrap! (nft-get-owner? player-avatar avatar-id) ERR-INVALID-AVATAR))
+      (current-level (get level current-metadata))
+      (current-experience (get experience current-metadata))
+    )
+    
+    ;; Authorization checks
+    (asserts! (is-protocol-admin tx-sender) ERR-NOT-AUTHORIZED)
+    
+    ;; Avatar validation
+    (asserts! (<= avatar-id (var-get total-avatars)) ERR-INVALID-AVATAR)
+    
+    ;; Experience and level validation
+    (asserts! (> experience-gained u0) ERR-INVALID-INPUT)
+    (asserts! (< current-level MAX-LEVEL) ERR-MAX-LEVEL-REACHED)
+    (asserts! 
+      (validate-experience-gain current-experience experience-gained current-level)
+      ERR-MAX-EXPERIENCE-REACHED
+    )
+    
+    ;; Calculate new stats
+    (let
+      (
+        (new-experience (+ current-experience experience-gained))
+        (should-level-up (can-level-up current-experience experience-gained current-level))
+        (new-level (if should-level-up (+ current-level u1) current-level))
+      )
+      
+      ;; Level up validation
+      (asserts! 
+        (or (not should-level-up) (<= new-level MAX-LEVEL))
+        ERR-MAX-LEVEL-REACHED
+      )
+      
+      ;; Update avatar metadata
+      (map-set avatar-metadata
+        { avatar-id: avatar-id }
+        (merge current-metadata
+          {
+            experience: new-experience,
+            level: new-level
+          }
+        )
+      )
+      
+      ;; Return success with level up status
+      (ok should-level-up)
+    )
+  )
+)
